@@ -1,0 +1,1 @@
+Service wrapper for Whatsapp-client.js
