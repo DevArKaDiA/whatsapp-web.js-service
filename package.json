@@ -2,13 +2,14 @@
   "name": "whatsapp_web_client_server",
   "version": "1.0.0",
   "description": "A wrapper server for whatsapp_js library",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "DeVArKaDiA",
   "license": "ISC",
+  "type": "module",
   "dependencies": {
-    "whatsapp-web.js": "^1.21.0"
+    "whatsapp-web.js": "1.21.0"
   }
 }
