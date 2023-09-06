@@ -15,6 +15,11 @@ export class SingletonHookStore {
     this.hooks.push(hook)
   }
 
+  public removeHook (hook: Hook): void {
+    const hookIndex = this.hooks.indexOf(hook)
+    this.hooks.splice(hookIndex, 1)
+  }
+
   public findHook (hookUUID: string): Hook | undefined {
     return this.hooks.find(hook => hook.uuid === hookUUID)
   }

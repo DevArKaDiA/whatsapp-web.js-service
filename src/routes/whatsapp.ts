@@ -19,6 +19,20 @@ restApp.post('/hooks/sub', function (req, res, next) {
   res.send(newHook)
 })
 
+restApp.delete('/hooks/unsub/:hookUUID', function (req, res) {
+  const hookUUID = req.params.hookUUID
+  const hookStore = SingletonHookStore.getInstance()
+  const hook = hookStore.findHook(hookUUID)
+  if (hook === undefined) {
+    res.status(404).send({
+      message: 'Hook not found'
+    })
+    return
+  }
+  hookStore.removeHook(hook)
+  res.send(hook)
+})
+
 restApp.get('/hooks', function (req, res) {
   const hookStore = SingletonHookStore.getInstance()
   res.send(hookStore.getHooks())
