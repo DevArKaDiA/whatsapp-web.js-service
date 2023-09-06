@@ -1,151 +1,66 @@
-import { Client, LocalAuth } from "whatsapp-web.js";
-import QRCode from "qrcode";
-import express from "express";
-import morgan from "morgan";
-import { json } from "body-parser";
+import { Client, Events as WhatsappEvents } from 'whatsapp-web.js'
+import QRCode from 'qrcode'
+import express from 'express'
+import morgan from 'morgan'
+import { SingletonHookStore } from './utils/stores'
+import { CompactValidationErrors } from './utils/exeptions'
 
-const restApp = express();
-restApp.use(morgan('tiny'));
-restApp.use(express.json());
-restApp.use(express.static("public"));
+export const restApp = express()
+restApp.use(morgan('tiny'))
+restApp.use(express.json())
+restApp.use(express.static('public'))
+restApp.use((error: CompactValidationErrors[] | unknown, req: express.Request, res: express.Response, next: express.NextFunction): void => {
+  if (error instanceof CompactValidationErrors) {
+    res.status(400).send(error)
+    return
+  }
+  res.status(500).send(error)
+})
 
 const whatsappClient = new Client(
-    {
-        puppeteer: { headless: "new" }
+  {
+    puppeteer: {
+
+      headless: 'new',
+      args: ['--no-sandbox']
     }
+  }
 )
 
-const eventsArray: string[] = [
-    'auth_failure',
-    'authenticated',
-    'change_battery',
-    'change_state',
-    'disconnected',
-    'group_join',
-    'group_leave',
-    'group_admin_changed',
-    'group_update',
-    'contact_changed',
-    'media_uploaded',
-    'message',
-    'message_ack',
-    'unread_count',
-    'message_create',
-    'message_revoke_everyone',
-    'message_revoke_me',
-    'message_reaction',
-    'chat_removed',
-    'chat_archived',
-    'loading_screen',
-    'qr',
-    'call',
-    'ready',
-    'remote_session_saved'
-];
-
-
-
-
-
-
-
-
-class Hook {
-    hookUUID: string;
-    hookUrl: string;
-    constructor({ hookUUID, hookUrl }: { hookUUID: string, hookUrl: string }) {
-        this.hookUUID = hookUUID;
-        this.hookUrl = hookUrl;
-    }
+function InitializeWebServer (): void {
+  restApp.listen(3333, function () {
+    console.log('Listening on port 3000!')
+  })
 }
 
-class SingletonHookStore {
-    private hooks: Hook[] = [];
-    private static instance: SingletonHookStore;
-    private constructor() { }
-    public static getInstance(): SingletonHookStore {
-        if (!SingletonHookStore.instance) {
-            SingletonHookStore.instance = new SingletonHookStore();
+function InitializeWhatsappAgent (): void {
+  InitializeWebServer()
+
+  whatsappClient.initialize()
+  whatsappClient.on('qr', (qr) => {
+    QRCode.toFile('public/qr.png', qr)
+    console.info('QR Ready')
+  })
+
+  whatsappClient.on('ready', () => {
+    console.info('Client is ready!')
+  })
+
+  const eventsArray = Object.values(WhatsappEvents)
+
+  eventsArray.forEach(eventName => {
+    whatsappClient.on(eventName, (event) => {
+      SingletonHookStore.getInstance().getHooks().forEach(hook => {
+        if (hook.events.includes(eventName)) {
+          fetch(hook.hookUrl, {
+            method: 'POST',
+            body: JSON.stringify({ eventName, event }),
+            headers: { 'Content-Type': 'application/json' }
+          })
         }
-        return SingletonHookStore.instance;
-    }
-    public addHook(hook: Hook): void {
-        this.hooks.push(hook);
-    }
-    public findHook(hookUUID: string): Hook | undefined {
-        return this.hooks.find(hook => hook.hookUUID === hookUUID);
-    }
-    public getHooks(): Hook[] {
-        return this.hooks;
-    }
-
+      })
+    })
+  })
 }
 
-
-restApp.post('/hooks/sub', function (req, res) {
-    const newHook: Hook = new Hook(req.body);
-    if (SingletonHookStore.getInstance().findHook(newHook.hookUUID)) {
-        res.status(400).send({
-            message: "Hook already exists"
-        });
-        return;
-    }
-    SingletonHookStore.getInstance().addHook(newHook);
-    res.send(newHook);
-    return;
-});
-
-
-restApp.get('/hooks', function (req, res) {
-    res.send([{
-        hookUUID: "123456789",
-        hookUrl: "https://webhook.site/123456789",
-    },
-    {
-        hookUUID: "123456789",
-        hookUrl: "https://webhook.site/123456789",
-    },
-    ]);
-});
-
-restApp.get('/hooks', function (req, res) {
-    res.send([{
-        hookUUID: "123456789",
-        hookUrl: "https://webhook.site/123456789",
-    },
-    {
-        hookUUID: "123456789",
-        hookUrl: "https://webhook.site/123456789",
-    },
-    ]);
-});
-
-function InitializeWebServer(): void {
-    restApp.listen(3000, function () {
-        console.log('Listening on port 3000!');
-    });
-}
-
-function InitializeWhatsappAgent(): void {
-    whatsappClient.initialize();
-    whatsappClient.on('qr', (qr) => {
-        QRCode.toFile('public/qr.png', qr)
-        console.info('QR Ready');
-        InitializeWebServer();
-    });
-    whatsappClient.on('ready', () => {
-        console.info('Client is ready!');
-    });
-    eventsArray.forEach(eventName => {
-        whatsappClient.on(eventName, (event) => {
-            console.log({eventName: eventName, event: event});
-        });
-    });
-    console.log(whatsappClient.eventNames());
-
-}
-
-
-
-InitializeWhatsappAgent();
-
+InitializeWhatsappAgent()
