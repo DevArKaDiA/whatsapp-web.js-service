@@ -6,6 +6,7 @@ import { SingletonHookStore } from './utils/stores'
 import { CompactValidationErrors } from './utils/exeptions'
 
 export const restApp = express()
+
 restApp.use(morgan('tiny'))
 restApp.use(express.json())
 restApp.use(express.static('public'))
@@ -27,15 +28,16 @@ const whatsappClient = new Client(
   }
 )
 
+let expressIsRunning = false
 function InitializeWebServer (): void {
-  restApp.listen(3333, function () {
-    console.log('Listening on port 3000!')
+  if (expressIsRunning) return
+  restApp.listen(3000, () => {
+    expressIsRunning = true
+    console.info('Server is running on port 3000')
   })
 }
 
 function InitializeWhatsappAgent (): void {
-  InitializeWebServer()
-
   whatsappClient.initialize()
   whatsappClient.on('qr', (qr) => {
     QRCode.toFile('public/qr.png', qr)
@@ -44,6 +46,7 @@ function InitializeWhatsappAgent (): void {
 
   whatsappClient.on('ready', () => {
     console.info('Client is ready!')
+    InitializeWebServer()
   })
 
   const eventsArray = Object.values(WhatsappEvents)
