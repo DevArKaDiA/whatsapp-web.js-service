@@ -1,25 +1,32 @@
-import { restApp } from '..'
-import Hook from '../entities/hook'
+import express from 'express'
+import { whatsappClient } from '../config/whatsapp'
+import { Msg, Hook } from '../entities'
 import { SingletonHookStore } from '../utils/stores'
 
-restApp.post('/hooks/sub', function (req, res, next) {
+const app = express()
+export default app
+/* -------------------------------------------------------------------------- */
+/*                               HOOK ENDPOINTS                               */
+/* -------------------------------------------------------------------------- */
+
+app.post('/hooks/sub', function (req, res, next) {
   const newHook: Hook = new Hook(req.body)
   const hookStore = SingletonHookStore.getInstance()
   newHook.validateOrReject().catch((errors) => {
     next(errors)
+  }).then(() => {
+    if (hookStore.findHook(newHook.uuid) !== undefined) {
+      res.status(400).send({
+        message: 'Hook already exists'
+      })
+      return
+    }
+    hookStore.addHook(newHook)
+    res.send(newHook)
   })
-
-  if (hookStore.findHook(newHook.uuid) !== undefined) {
-    res.status(400).send({
-      message: 'Hook already exists'
-    })
-    return
-  }
-  hookStore.addHook(newHook)
-  res.send(newHook)
 })
 
-restApp.delete('/hooks/unsub/:hookUUID', function (req, res) {
+app.delete('/hooks/unsub/:hookUUID', function (req, res) {
   const hookUUID = req.params.hookUUID
   const hookStore = SingletonHookStore.getInstance()
   const hook = hookStore.findHook(hookUUID)
@@ -33,12 +40,13 @@ restApp.delete('/hooks/unsub/:hookUUID', function (req, res) {
   res.send(hook)
 })
 
-restApp.get('/hooks', function (req, res) {
+app.get('/hooks', function (req, res) {
+  console.log('GET /hooks')
   const hookStore = SingletonHookStore.getInstance()
   res.send(hookStore.getHooks())
 })
 
-restApp.get('/hooks/:hookUUID', function (req, res) {
+app.get('/hooks/:hookUUID', function (req, res) {
   const hookUUID = req.params.hookUUID
   const hook = SingletonHookStore.getInstance().findHook(hookUUID)
   if (hook === undefined) {
@@ -48,4 +56,28 @@ restApp.get('/hooks/:hookUUID', function (req, res) {
     return
   }
   res.send(hook)
+})
+
+/* -------------------------------------------------------------------------- */
+/*                              WHATSAPP ACTIONS                              */
+/* -------------------------------------------------------------------------- */
+
+app.post('/msg/send', function (req, res, next) {
+  const msg: Msg = new Msg(req.body)
+
+  msg.validateOrReject().catch((errors) => {
+    next(errors)
+  }).then(() => {
+    const ChatId: string = msg.phone.replace(/\D/g, '') + '@c.us'
+
+    whatsappClient.sendMessage(ChatId, msg.msg)
+      .then((message) => {
+        res.send(
+          message
+        )
+      })
+      .catch((error) => {
+        next(error)
+      })
+  })
 })
