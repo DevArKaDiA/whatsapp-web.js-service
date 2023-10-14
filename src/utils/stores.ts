@@ -1,4 +1,4 @@
-import type Hook from '../entities/hook'
+import { type Hook } from '../entities'
 
 export class SingletonHookStore {
   private readonly hooks: Hook[] = []
