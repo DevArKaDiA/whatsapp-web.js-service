@@ -8,6 +8,9 @@ import { whatsappClient } from './config/whatsapp'
 import whatsapp from './routes/whatsapp'
 export const restApp = express()
 
+let QR_READY = false
+let expressIsRunning = false
+
 restApp.use(morgan('tiny'))
 restApp.use(express.static('public'))
 restApp.use(express.json())
@@ -21,10 +24,9 @@ restApp.use((error: CompactValidationErrors[] | unknown, req: express.Request, r
 })
 
 restApp.get('/', (req, res) => {
-  res.send('Hello World!')
+  if (QR_READY) { res.sendFile('/public/qr.png') } else { res.send('Waiting for QR Refresh') }
 })
 
-let expressIsRunning = false
 function InitializeWebServer (): void {
   if (expressIsRunning) return
   restApp.listen(3000, () => {
@@ -35,8 +37,10 @@ function InitializeWebServer (): void {
 
 function InitializeWhatsappAgent (): void {
   whatsappClient.initialize()
+  InitializeWebServer()
   whatsappClient.on('qr', (qr) => {
     QRCode.toFile('public/qr.png', qr)
+    QR_READY = true
     console.info('QR Ready')
   })
 
@@ -53,8 +57,6 @@ function InitializeWhatsappAgent (): void {
       message.reply('pong')
     }
   })
-
-  InitializeWebServer()
 
   const eventsArray = Object.values(WhatsappEvents)
 
