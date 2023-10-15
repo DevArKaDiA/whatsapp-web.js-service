@@ -1,0 +1,6 @@
+version: "3"
+services:
+  app:
+    image: arkadia0315/whatsappweb-js-service:0.3.0
+    ports:
+      - "3000:3000"
